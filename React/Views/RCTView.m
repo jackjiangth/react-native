@@ -149,10 +149,41 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
 
 - (NSString *)accessibilityLabel
 {
-  if (super.accessibilityLabel) {
-    return super.accessibilityLabel;
+  NSString *label = super.accessibilityLabel;
+  if (label) {
+    return label;
   }
   return RCTRecursiveAccessibilityLabel(self);
+}
+
+- (NSArray <UIAccessibilityCustomAction *> *)accessibilityCustomActions
+{
+  if (!_accessibilityActions.count) {
+    return nil;
+  }
+
+  NSMutableArray *actions = [NSMutableArray array];
+  for (NSString *action in _accessibilityActions) {
+    [actions addObject:[[UIAccessibilityCustomAction alloc] initWithName:action
+                                                                  target:self
+                                                                selector:@selector(didActivateAccessibilityCustomAction:)]];
+  }
+
+  return [actions copy];
+}
+
+- (BOOL)didActivateAccessibilityCustomAction:(UIAccessibilityCustomAction *)action
+{
+  if (!_onAccessibilityAction) {
+    return NO;
+  }
+
+  _onAccessibilityAction(@{
+    @"action": action.name,
+    @"target": self.reactTag
+  });
+
+  return YES;
 }
 
 - (void)setPointerEvents:(RCTPointerEvents)pointerEvents
@@ -443,7 +474,7 @@ static CGFloat RCTDefaultIfNegativeTo(CGFloat defaultValue, CGFloat x) {
   const CGFloat borderWidth = MAX(0, _borderWidth);
   const BOOL isRTL = _reactLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
 
-  if ([[RCTI18nUtil sharedInstance] doesRTLFlipLeftAndRightStyles]) {
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
     const CGFloat borderStartWidth = RCTDefaultIfNegativeTo(_borderLeftWidth, _borderStartWidth);
     const CGFloat borderEndWidth = RCTDefaultIfNegativeTo(_borderRightWidth, _borderEndWidth);
 
@@ -479,7 +510,7 @@ static CGFloat RCTDefaultIfNegativeTo(CGFloat defaultValue, CGFloat x) {
   CGFloat bottomLeftRadius;
   CGFloat bottomRightRadius;
 
-  if ([[RCTI18nUtil sharedInstance] doesRTLFlipLeftAndRightStyles]) {
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
     const CGFloat topStartRadius = RCTDefaultIfNegativeTo(_borderTopLeftRadius, _borderTopStartRadius);
     const CGFloat topEndRadius = RCTDefaultIfNegativeTo(_borderTopRightRadius, _borderTopEndRadius);
     const CGFloat bottomStartRadius = RCTDefaultIfNegativeTo(_borderBottomLeftRadius, _borderBottomStartRadius);
@@ -526,7 +557,7 @@ static CGFloat RCTDefaultIfNegativeTo(CGFloat defaultValue, CGFloat x) {
 {
   const BOOL isRTL = _reactLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
 
-  if ([[RCTI18nUtil sharedInstance] doesRTLFlipLeftAndRightStyles]) {
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
     const CGColorRef borderStartColor = _borderStartColor ?: _borderLeftColor;
     const CGColorRef borderEndColor = _borderEndColor ?: _borderRightColor;
 
@@ -658,14 +689,6 @@ static CGFloat RCTDefaultIfNegativeTo(CGFloat defaultValue, CGFloat x) {
 static BOOL RCTLayerHasShadow(CALayer *layer)
 {
   return layer.shadowOpacity * CGColorGetAlpha(layer.shadowColor) > 0;
-}
-
-- (void)reactSetInheritedBackgroundColor:(UIColor *)inheritedBackgroundColor
-{
-  // Inherit background color if a shadow has been set, as an optimization
-  if (RCTLayerHasShadow(self.layer)) {
-    self.backgroundColor = inheritedBackgroundColor;
-  }
 }
 
 static void RCTUpdateShadowPathForView(RCTView *view)
